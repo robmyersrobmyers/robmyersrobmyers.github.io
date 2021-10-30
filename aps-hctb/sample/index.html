@@ -16,53 +16,14 @@
     <div style="width: 25%; min-height: 200px; margin: 0 auto">
       <canvas id="notificationPieChartCanvas"></canvas>
     </div>
+    <p />
+    <div style="width: 25%; min-height: 200px; margin: 0 auto">
+      <center>
+        Built using
+        <a href="https://github.com/robmyersrobmyers/aps-hctb">aps-hctb</a>.
+      </center>
+    </div>
     <script>
-      const statData = fetch('https://robmyersrobmyers.github.io/aps-hctb/sample/statistics.json').then(response => json = response.json());
-console.log(`${JSON.stringify(statData, null, 2)}`);
-      let amData = [];
-      let pmData = [];
-      let subBusData = [];
-      let noAMData = [];
-      let noPMData = [];
-
-      function getNewDateFromKey(key) {
-        let d = new Date(key);
-        const offset = d.getTimezoneOffset();
-        d = new Date(d.getTime() + offset * 60 * 1000);
-        return d;
-      }
-
-      // Construct Data Arrays
-      for (const key in statData) {
-        if (statData[key]) {
-          if (statData[key].AM && statData[key].AM.deviationSeconds) {
-            amData.push({
-              x: statData[key].AM.notificationTime,
-              y: statData[key].AM.deviationSeconds,
-            });
-          } else {
-            noAMData.push({ x: getNewDateFromKey(key), y: -15 });
-          }
-          if (statData[key].PM && statData[key].PM.deviationSeconds) {
-            pmData.push({
-              x: statData[key].PM.notificationTime,
-              y: statData[key].PM.deviationSeconds,
-            });
-          } else {
-            noPMData.push({ x: getNewDateFromKey(key), y: 15 });
-          }
-          if (
-            (statData[key].AM && statData[key].AM.busSubstitution) ||
-            (statData[key].PM && statData[key].PM.busSubstitution)
-          ) {
-            subBusData.push({ x: getNewDateFromKey(key), y: 0 });
-          }
-        } else {
-          noAMData.push({ x: getNewDateFromKey(key), y: -15 });
-          noPMData.push({ x: getNewDateFromKey(key), y: 15 });
-        }
-      }
-
       function computeStats(obj) {
         const inPersonSchoolDays = Object.keys(obj).length;
         const expectedTotalStops = inPersonSchoolDays * 2; // We expect two stops per day
@@ -104,97 +65,153 @@ console.log(`${JSON.stringify(statData, null, 2)}`);
         };
       }
 
-      let pieStatData = computeStats(statData);
+      function getNewDateFromKey(key) {
+        let d = new Date(key);
+        const offset = d.getTimezoneOffset();
+        d = new Date(d.getTime() + offset * 60 * 1000);
+        return d;
+      }
 
-      let pie = document
-        .getElementById("notificationPieChartCanvas")
-        .getContext("2d");
-      let notificationPieChartCanvas = new Chart(pie, {
-        type: "pie",
-        data: {
-          labels: ["Notification Sent", "No Notification Sent"],
-          datasets: [
-            {
-              label: "Here Comes The Bus Radius Entry Efficacy",
-              data: [
-                pieStatData.radiusNotificationTotal,
-                pieStatData.expectedTotalStops -
+      async function fetchJson(url) {
+        const response = await fetch(url);
+        const data = await response.json();
+        return data;
+      }
+
+      async function buildPlots() {
+        const statsUrl = "statistics.json";
+        const statData = await fetchJson(statsUrl);
+
+        let amData = [];
+        let pmData = [];
+        let subBusData = [];
+        let noAMData = [];
+        let noPMData = [];
+
+        // Construct Data Arrays
+        for (const key in statData) {
+          if (statData[key]) {
+            if (statData[key].AM && statData[key].AM.deviationSeconds) {
+              amData.push({
+                x: statData[key].AM.notificationTime,
+                y: statData[key].AM.deviationSeconds,
+              });
+            } else {
+              noAMData.push({ x: getNewDateFromKey(key), y: -15 });
+            }
+            if (statData[key].PM && statData[key].PM.deviationSeconds) {
+              pmData.push({
+                x: statData[key].PM.notificationTime,
+                y: statData[key].PM.deviationSeconds,
+              });
+            } else {
+              noPMData.push({ x: getNewDateFromKey(key), y: 15 });
+            }
+            if (
+              (statData[key].AM && statData[key].AM.busSubstitution) ||
+              (statData[key].PM && statData[key].PM.busSubstitution)
+            ) {
+              subBusData.push({ x: getNewDateFromKey(key), y: 0 });
+            }
+          } else {
+            noAMData.push({ x: getNewDateFromKey(key), y: -15 });
+            noPMData.push({ x: getNewDateFromKey(key), y: 15 });
+          }
+        }
+
+        let pieStatData = computeStats(statData);
+
+        let pie = document
+          .getElementById("notificationPieChartCanvas")
+          .getContext("2d");
+        let notificationPieChartCanvas = new Chart(pie, {
+          type: "pie",
+          data: {
+            labels: ["Notification Sent", "No Notification Sent"],
+            datasets: [
+              {
+                label: "Here Comes The Bus Radius Entry Efficacy",
+                data: [
                   pieStatData.radiusNotificationTotal,
-              ],
-              backgroundColor: ["#3e95cd", "#ffa500"],
-              hoverOffset: 4,
-            },
-          ],
-        },
-      });
-      let ctx = document
-        .getElementById("notificationAnalysisCanvas")
-        .getContext("2d");
-      let notificationAnalysisCanvas = new Chart(ctx, {
-        type: "scatter",
-        data: {
-          datasets: [
-            {
-              data: amData,
-              label: "AM Arrival",
-              borderColor: "#3e95cd",
-              backgroundColor: "rgb(62,149,205,0.1)",
-              borderWidth: 2,
-            },
-            {
-              data: pmData,
-              label: "PM Arrival",
-              borderColor: "#ffa500",
-              backgroundColor: "rgb(255,165,0,0.1)",
-              borderWidth: 2,
-            },
-            {
-              data: subBusData,
-              label: "Substitute Bus",
-              borderColor: "#11cc11",
-              backgroundColor: "rgb(17,255,17,0.1)",
-              borderWidth: 2,
-            },
-            {
-              data: noAMData,
-              label: "No Notification Sent (AM)",
-              borderColor: "#ff1000",
-              backgroundColor: "rgb(255,17,0,0.1)",
-              borderWidth: 2,
-            },
-            {
-              data: noPMData,
-              label: "No Notification Sent (AM)",
-              borderColor: "#ff1000",
-              backgroundColor: "rgb(255,17,0,0.1)",
-              borderWidth: 2,
-            },
-          ],
-        },
-        options: {
-          plugins: {
-            title: {
-              text: "Here Comes The Bus Notification Analysis",
-              display: true,
-            },
-          },
-          scales: {
-            x: {
-              type: "time",
-              time: {
-                // Luxon format string
-                //tooltipFormat: 'yyyy-MM-DD'
+                  pieStatData.expectedTotalStops -
+                    pieStatData.radiusNotificationTotal,
+                ],
+                backgroundColor: ["#3e95cd", "#ffa500"],
+                hoverOffset: 4,
               },
-            },
-            y: {
+            ],
+          },
+        });
+        let ctx = document
+          .getElementById("notificationAnalysisCanvas")
+          .getContext("2d");
+        let notificationAnalysisCanvas = new Chart(ctx, {
+          type: "scatter",
+          data: {
+            datasets: [
+              {
+                data: amData,
+                label: "AM Arrival",
+                borderColor: "#3e95cd",
+                backgroundColor: "rgb(62,149,205,0.1)",
+                borderWidth: 2,
+              },
+              {
+                data: pmData,
+                label: "PM Arrival",
+                borderColor: "#ffa500",
+                backgroundColor: "rgb(255,165,0,0.1)",
+                borderWidth: 2,
+              },
+              {
+                data: subBusData,
+                label: "Substitute Bus",
+                borderColor: "#11cc11",
+                backgroundColor: "rgb(17,255,17,0.1)",
+                borderWidth: 2,
+              },
+              {
+                data: noAMData,
+                label: "No Notification Sent (AM)",
+                borderColor: "#ff1000",
+                backgroundColor: "rgb(255,17,0,0.1)",
+                borderWidth: 2,
+              },
+              {
+                data: noPMData,
+                label: "No Notification Sent (AM)",
+                borderColor: "#ff1000",
+                backgroundColor: "rgb(255,17,0,0.1)",
+                borderWidth: 2,
+              },
+            ],
+          },
+          options: {
+            plugins: {
               title: {
+                text: "Here Comes The Bus Notification Analysis",
                 display: true,
-                text: "Difference from Scheduled Arrival Time (s)",
+              },
+            },
+            scales: {
+              x: {
+                type: "time",
+                time: {
+                  // Luxon format string
+                  //tooltipFormat: 'yyyy-MM-DD'
+                },
+              },
+              y: {
+                title: {
+                  display: true,
+                  text: "Difference from Scheduled Arrival Time (s)",
+                },
               },
             },
           },
-        },
-      });
+        });
+      }
+      buildPlots();
     </script>
   </body>
 </html>
