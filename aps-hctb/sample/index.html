@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Here Comes The Bus Notification Analysis</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@^3"></script>
+    <script src="https://cdn.jsdelivr.net/npm/luxon@^2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-luxon@^1"></script>
+  </head>
+  <body>
+    <div>
+      <canvas id="notificationAnalysisCanvas"></canvas>
+    </div>
+    <p />
+    <div style="width: 25%; min-height: 200px; margin: 0 auto">
+      <canvas id="notificationPieChartCanvas"></canvas>
+    </div>
+    <script>
+      const statData = fetch('https://robmyersrobmyers.github.io/aps-hctb/sample/statistics.json').then(response => json = response.json());
+      let amData = [];
+      let pmData = [];
+      let subBusData = [];
+      let noAMData = [];
+      let noPMData = [];
+
+      function getNewDateFromKey(key) {
+        let d = new Date(key);
+        const offset = d.getTimezoneOffset();
+        d = new Date(d.getTime() + offset * 60 * 1000);
+        return d;
+      }
+
+      // Construct Data Arrays
+      for (const key in statData) {
+        if (statData[key]) {
+          if (statData[key].AM && statData[key].AM.deviationSeconds) {
+            amData.push({
+              x: statData[key].AM.notificationTime,
+              y: statData[key].AM.deviationSeconds,
+            });
+          } else {
+            noAMData.push({ x: getNewDateFromKey(key), y: -15 });
+          }
+          if (statData[key].PM && statData[key].PM.deviationSeconds) {
+            pmData.push({
+              x: statData[key].PM.notificationTime,
+              y: statData[key].PM.deviationSeconds,
+            });
+          } else {
+            noPMData.push({ x: getNewDateFromKey(key), y: 15 });
+          }
+          if (
+            (statData[key].AM && statData[key].AM.busSubstitution) ||
+            (statData[key].PM && statData[key].PM.busSubstitution)
+          ) {
+            subBusData.push({ x: getNewDateFromKey(key), y: 0 });
+          }
+        } else {
+          noAMData.push({ x: getNewDateFromKey(key), y: -15 });
+          noPMData.push({ x: getNewDateFromKey(key), y: 15 });
+        }
+      }
+
+      function computeStats(obj) {
+        const inPersonSchoolDays = Object.keys(obj).length;
+        const expectedTotalStops = inPersonSchoolDays * 2; // We expect two stops per day
+        let radiusNotificationTotal = 0;
+        let substitutionNotificationTotal = 0;
+        let notificationTotal = 0;
+
+        for (const key in obj) {
+          if (obj[key]) {
+            if (obj[key].AM) {
+              if (obj[key].AM.notificationTime) {
+                radiusNotificationTotal++;
+                notificationTotal++;
+              }
+              if (obj[key].AM.busSubstitution) {
+                substitutionNotificationTotal++;
+                notificationTotal++;
+              }
+            }
+            if (obj[key].PM) {
+              if (obj[key].PM.notificationTime) {
+                radiusNotificationTotal++;
+                notificationTotal++;
+              }
+              if (obj[key].PM.busSubstitution) {
+                substitutionNotificationTotal++;
+                notificationTotal++;
+              }
+            }
+          }
+        }
+
+        return {
+          inPersonSchoolDays: inPersonSchoolDays,
+          expectedTotalStops: expectedTotalStops,
+          radiusNotificationTotal: radiusNotificationTotal,
+          substitutionNotificationTotal: substitutionNotificationTotal,
+          notificationTotal: notificationTotal,
+        };
+      }
+
+      let pieStatData = computeStats(statData);
+
+      let pie = document
+        .getElementById("notificationPieChartCanvas")
+        .getContext("2d");
+      let notificationPieChartCanvas = new Chart(pie, {
+        type: "pie",
+        data: {
+          labels: ["Notification Sent", "No Notification Sent"],
+          datasets: [
+            {
+              label: "Here Comes The Bus Radius Entry Efficacy",
+              data: [
+                pieStatData.radiusNotificationTotal,
+                pieStatData.expectedTotalStops -
+                  pieStatData.radiusNotificationTotal,
+              ],
+              backgroundColor: ["#3e95cd", "#ffa500"],
+              hoverOffset: 4,
+            },
+          ],
+        },
+      });
+      let ctx = document
+        .getElementById("notificationAnalysisCanvas")
+        .getContext("2d");
+      let notificationAnalysisCanvas = new Chart(ctx, {
+        type: "scatter",
+        data: {
+          datasets: [
+            {
+              data: amData,
+              label: "AM Arrival",
+              borderColor: "#3e95cd",
+              backgroundColor: "rgb(62,149,205,0.1)",
+              borderWidth: 2,
+            },
+            {
+              data: pmData,
+              label: "PM Arrival",
+              borderColor: "#ffa500",
+              backgroundColor: "rgb(255,165,0,0.1)",
+              borderWidth: 2,
+            },
+            {
+              data: subBusData,
+              label: "Substitute Bus",
+              borderColor: "#11cc11",
+              backgroundColor: "rgb(17,255,17,0.1)",
+              borderWidth: 2,
+            },
+            {
+              data: noAMData,
+              label: "No Notification Sent (AM)",
+              borderColor: "#ff1000",
+              backgroundColor: "rgb(255,17,0,0.1)",
+              borderWidth: 2,
+            },
+            {
+              data: noPMData,
+              label: "No Notification Sent (AM)",
+              borderColor: "#ff1000",
+              backgroundColor: "rgb(255,17,0,0.1)",
+              borderWidth: 2,
+            },
+          ],
+        },
+        options: {
+          plugins: {
+            title: {
+              text: "Here Comes The Bus Notification Analysis",
+              display: true,
+            },
+          },
+          scales: {
+            x: {
+              type: "time",
+              time: {
+                // Luxon format string
+                //tooltipFormat: 'yyyy-MM-DD'
+              },
+            },
+            y: {
+              title: {
+                display: true,
+                text: "Difference from Scheduled Arrival Time (s)",
+              },
+            },
+          },
+        },
+      });
+    </script>
+  </body>
+</html>
